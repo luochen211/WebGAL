@@ -31,6 +31,9 @@ jobs:
       - name: Parser Test
         run: yarn parser:test --run
 
+      - name: Rich Text Test
+        run: yarn vitest run packages/webgal/test/parseTextSegments.test.ts --threads false
+
       # 生成静态文件
       - name: Build
         run: yarn build && cd ./packages/webgal && touch dist/.nojekyll

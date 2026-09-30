@@ -11,6 +11,7 @@ import { SCREEN_CONSTANTS } from '@/Core/util/constants';
 import useEscape from '@/hooks/useEscape';
 import { useStageState } from '@/hooks/useStageState';
 import { concatTextLines } from './concatTextLines';
+import { EnhancedValue, parseTextSegments, SegmentType } from './parseTextSegments';
 import { getDialogSegments } from '@/Core/Modules/stage/dialogText';
 
 const userAgent = navigator.userAgent;
@@ -132,7 +133,7 @@ export function compileSentence(
   // 先拆行
   const lines = sentence.split(/(?<!\\)\|/).map((val: string) => useEscape(val));
   // 对每一行进行注音处理
-  const rubyLines = lines.map((line) => parseString(line));
+  const rubyLines = lines.map((line) => parseTextSegments(line));
   const nodeLines = rubyLines.map((line) => {
     const ln: EnhancedNode[] = [];
     line.forEach((node, index) => {
@@ -249,75 +250,4 @@ export function splitChars(sentence: string, replace_space_with_nbsp = true) {
   }
 
   return words;
-}
-
-enum SegmentType {
-  String = 'SegmentType.String',
-  Link = 'SegmentType.Link',
-}
-
-interface EnhancedValue {
-  text: string;
-  ruby: string;
-  values: { key: string; value: string }[];
-}
-
-interface Segment {
-  type: SegmentType;
-  value?: string | EnhancedValue;
-}
-
-function parseString(input: string): Segment[] {
-  const regex = /(\[([^\]]+)\]\(([^)]+)\))|([\s\S]+?(?=\[|$))/g;
-  const result: Segment[] = [];
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(input)) !== null) {
-    if (match[1]) {
-      // 链接部分
-      const text = match[2];
-      const enhance = match[3];
-      let parsedEnhanced: KeyValuePair[] = [];
-      let ruby = '';
-      if (enhance.match(/style=|tips=|ruby=|style-alltext=/)) {
-        parsedEnhanced = parseEnhancedString(enhance);
-        const rubyKvPair = parsedEnhanced.find((e) => e.key === 'ruby');
-        if (rubyKvPair) {
-          ruby = rubyKvPair.value;
-        }
-      } else {
-        ruby = enhance;
-      }
-      result.push({ type: SegmentType.Link, value: { text, ruby, values: parsedEnhanced } });
-    } else {
-      // 普通文本
-      const text = match[0];
-      result.push({ type: SegmentType.String, value: text });
-    }
-  }
-
-  // 我也不知道为什么，不加这个就会导致在 Enhanced Value 处于行首时故障
-  // 你可以认为这个代码不明所以，但是不要删除
-  result.unshift({ type: SegmentType.String, value: '' });
-  return result;
-}
-
-interface KeyValuePair {
-  key: string;
-  value: string;
-}
-
-function parseEnhancedString(enhanced: string): KeyValuePair[] {
-  const result: KeyValuePair[] = [];
-  const regex = /(\S+)=(.*?)(?=\s+\S+=|\s*$)/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(enhanced)) !== null) {
-    result.push({
-      key: match[1],
-      value: match[2].replace(/~/g, ':').trim(),
-    });
-  }
-
-  return result;
 }
